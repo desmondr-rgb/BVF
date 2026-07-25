@@ -41,12 +41,14 @@ import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-
  * (see /firebase/firestore.rules and /firebase/storage.rules).
  */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyAMWfsVHftBRt3Y332OS6Ong9q2Lx39sYs",
+  authDomain: "bvf-vms.firebaseapp.com",
+  databaseURL: "https://bvf-vms-default-rtdb.firebaseio.com",
+  projectId: "bvf-vms",
+  storageBucket: "bvf-vms.firebasestorage.app",
+  messagingSenderId: "545505093773",
+  appId: "1:545505093773:web:0464b46c15676aaf789ac4",
+  measurementId: "G-F2H8CF9SX8"
 };
 
 // Initialize Firebase App (single instance for the whole SPA)

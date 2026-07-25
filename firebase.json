@@ -1,0 +1,24 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "firebase/**",
+      "README.md"
+    ],
+    "rewrites": [
+      { "source": "/login", "destination": "/pages/login.html" },
+      { "source": "/register", "destination": "/pages/register.html" },
+      { "source": "/dashboard", "destination": "/pages/dashboard.html" }
+    ]
+  },
+  "firestore": {
+    "rules": "firebase/firestore.rules",
+    "indexes": "firebase/firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "firebase/storage.rules"
+  }
+}

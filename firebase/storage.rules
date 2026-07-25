@@ -1,0 +1,73 @@
+rules_version = '2';
+
+/**
+ * ============================================================================
+ * FIREBASE STORAGE SECURITY RULES — Volleyball Management System
+ * ============================================================================
+ * Phase 1 scope: any signed-in user can read public media (photos, logos);
+ * writes are restricted to authenticated users and capped in size/type.
+ * Tighter per-role write rules (e.g. only a Team Manager can upload their
+ * own team's logo) will be layered on in Phase 2 once team documents
+ * exist to cross-reference against.
+ *
+ * Deploy with:  firebase deploy --only storage
+ * ============================================================================
+ */
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function underSizeLimit(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024;
+    }
+
+    // Player profile photos
+    match /player-photos/{playerId}/{fileName} {
+      allow read: if true; // public-facing profile photos
+      allow write: if isSignedIn() && isImage() && underSizeLimit(5);
+    }
+
+    // Team logos
+    match /team-logos/{teamId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isImage() && underSizeLimit(5);
+    }
+
+    // Match / tournament photos
+    match /match-photos/{matchId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isImage() && underSizeLimit(10);
+    }
+
+    match /tournament-images/{tournamentId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isImage() && underSizeLimit(10);
+    }
+
+    // Documents & certificates (coaching certifications, referee certs, etc.)
+    // Kept private: only signed-in users may read, since these can contain
+    // personal/sensitive documents.
+    match /documents/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && underSizeLimit(15);
+    }
+
+    match /certificates/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && underSizeLimit(15);
+    }
+
+    // Default deny for anything not explicitly matched above.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

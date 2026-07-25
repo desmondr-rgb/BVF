@@ -1,0 +1,133 @@
+rules_version = '2';
+
+/**
+ * ============================================================================
+ * FIRESTORE SECURITY RULES — Volleyball Management System
+ * ============================================================================
+ * Phase 1 scope: lock down the `users` collection (auth profiles/roles) and
+ * establish the reusable helper functions + default-deny posture that every
+ * later collection (players, teams, leagues, matches, ...) will build on
+ * in Phase 2/3. Collections not yet explicitly listed fall through to the
+ * default-deny rule at the bottom, so nothing is accidentally left open.
+ *
+ * Deploy with:  firebase deploy --only firestore:rules
+ * ============================================================================
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------
+    // Helper functions
+    // ---------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function currentUid() {
+      return request.auth.uid;
+    }
+
+    // Reads the requesting user's own profile doc to check their role.
+    // NOTE: this performs an extra document read on every rule evaluation
+    // that calls it; Firestore caches rule reads within a single request.
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(currentUid())).data;
+    }
+
+    function myRole() {
+      return isSignedIn() ? myProfile().role : null;
+    }
+
+    function hasAnyRole(roles) {
+      return isSignedIn() && myRole() in roles;
+    }
+
+    function isSuperAdmin() {
+      return hasAnyRole(['super_admin']);
+    }
+
+    function isAdmin() {
+      return hasAnyRole(['super_admin', 'federation_admin', 'league_admin', 'club_admin']);
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && currentUid() == userId;
+    }
+
+    // ---------------------------------------------------------------------
+    // users/{userId}
+    // Every authenticated user has exactly one profile document here,
+    // keyed by their Firebase Auth UID. Users can read/update their own
+    // basic profile fields; only admins can change roles or read the
+    // full user directory.
+    // ---------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Account creation happens via the register flow (auth-service.js),
+      // which writes the doc with the caller's own UID as the ID.
+      allow create: if isOwner(userId)
+                    && request.resource.data.uid == userId
+                    && request.resource.data.role == 'viewer'; // self-registration can never grant elevated roles
+
+      // Users may update their own non-privileged fields; only admins may
+      // change `role` or `status` (suspend/enable accounts).
+      allow update: if isOwner(userId)
+                      && request.resource.data.role == resource.data.role
+                      && request.resource.data.status == resource.data.status
+                    || isAdmin();
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---------------------------------------------------------------------
+    // audit_logs/{logId}
+    // System-written records of sensitive actions. Readable by admins only;
+    // written only by trusted server contexts (Cloud Functions with the
+    // Admin SDK bypass rules entirely — this mainly blocks direct client
+    // writes, which would let someone forge the audit trail).
+    // ---------------------------------------------------------------------
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // settings/{docId}
+    // Global app settings (e.g. current season, feature flags).
+    // ---------------------------------------------------------------------
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // ---------------------------------------------------------------------
+    // Placeholders for collections introduced in later phases
+    // (players, teams, coaches, leagues, tournaments, matches, venues,
+    // referees, statistics, training_sessions, attendance, notifications,
+    // reports, payments). Left commented out intentionally: until each
+    // module's real read/write rules are written, the default-deny rule
+    // below keeps them fully inaccessible rather than silently open.
+    // ---------------------------------------------------------------------
+
+    // match /players/{playerId} { ... }
+    // match /teams/{teamId} { ... }
+    // match /coaches/{coachId} { ... }
+    // match /leagues/{leagueId} { ... }
+    // match /tournaments/{tournamentId} { ... }
+    // match /matches/{matchId} { ... }
+    // match /venues/{venueId} { ... }
+    // match /referees/{refereeId} { ... }
+
+    // ---------------------------------------------------------------------
+    // Default deny: any collection not explicitly matched above is fully
+    // inaccessible. This must stay LAST.
+    // ---------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
